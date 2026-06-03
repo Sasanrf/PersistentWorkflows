@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+    <File Path="USAGE.md" />
+  </Folder>
+  <Project Path="PersistentWorkflows.Abstractions/PersistentWorkflows.Abstractions.csproj" />
+  <Project Path="PersistentWorkflows.Core.Tests/PersistentWorkflows.Core.Tests.csproj" />
+  <Project Path="PersistentWorkflows.Core/PersistentWorkflows.Core.csproj" />
+  <Project Path="PersistentWorkflows.EntityFrameworkCore.Tests/PersistentWorkflows.EntityFrameworkCore.Tests.csproj" />
+  <Project Path="PersistentWorkflows.EntityFrameworkCore/PersistentWorkflows.EntityFrameworkCore.csproj" />
+  <Project Path="PersistentWorkflows.Sample.Console/PersistentWorkflows.Sample.Console.csproj" Id="720d0bea-7c8d-4d92-9de0-0edae8103f58" />
+</Solution>
