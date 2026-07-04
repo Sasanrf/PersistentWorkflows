@@ -10,5 +10,6 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageTags>workflow;durable-workflows;dotnet;ef-core;orchestration</PackageTags>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<Version>0.1.0-preview.1</Version>
 	</PropertyGroup>
 </Project>
