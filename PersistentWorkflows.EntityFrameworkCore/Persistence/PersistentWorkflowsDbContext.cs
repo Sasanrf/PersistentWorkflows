@@ -13,6 +13,7 @@ public sealed class PersistentWorkflowsDbContext : DbContext
     public DbSet<WorkflowInstanceEntity> WorkflowInstances => Set<WorkflowInstanceEntity>();
 
     public DbSet<WorkflowStepExecutionEntity> WorkflowStepExecutions => Set<WorkflowStepExecutionEntity>();
+    public DbSet<WorkflowSignalEntity> WorkflowSignals => Set<WorkflowSignalEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -20,6 +21,11 @@ public sealed class PersistentWorkflowsDbContext : DbContext
 
         ConfigureWorkflowInstance(modelBuilder);
         ConfigureWorkflowStepExecution(modelBuilder);
+        var signal = modelBuilder.Entity<WorkflowSignalEntity>();
+        signal.ToTable("WorkflowSignals", "PersistentWorkflows");
+        signal.HasKey(x => new { x.WorkflowInstanceId, x.Name });
+        signal.Property(x => x.Name).HasMaxLength(200);
+        signal.HasOne<WorkflowInstanceEntity>().WithMany().HasForeignKey(x => x.WorkflowInstanceId).OnDelete(DeleteBehavior.Cascade);
     }
 
     private static void ConfigureWorkflowInstance(ModelBuilder modelBuilder)
@@ -52,6 +58,16 @@ public sealed class PersistentWorkflowsDbContext : DbContext
             .IsUnique();
 
         entity.HasIndex(x => x.NextExecutionAtUtc);
+        entity.HasIndex(x => new { x.Status, x.NextExecutionAtUtc });
+        entity.HasIndex(x => new { x.Status, x.LeaseExpiresAtUtc });
+        entity.Property(x => x.InputHash).HasMaxLength(64);
+        entity.Property(x => x.DefinitionVersion).HasDefaultValue(1);
+        entity.Property(x => x.ContextSchemaVersion).HasDefaultValue(1);
+        entity.Property(x => x.DefinitionHash).HasMaxLength(64);
+        entity.Property(x => x.CurrentStepName).HasMaxLength(200);
+        entity.Property(x => x.WaitingSignal).HasMaxLength(200);
+        entity.Property(x => x.LastErrorCode).HasMaxLength(100);
+        entity.Property(x => x.LastErrorMessage).HasMaxLength(4000);
     }
 
     private static void ConfigureWorkflowStepExecution(ModelBuilder modelBuilder)

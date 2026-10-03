@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>PersistentWorkflows.EntityFrameworkCore.SqlServer</PackageId>
+    <Description>Durable workflows for .NET with SQL Server persistence, migrations, and background execution.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PersistentWorkflows.EntityFrameworkCore/PersistentWorkflows.EntityFrameworkCore.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.8" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

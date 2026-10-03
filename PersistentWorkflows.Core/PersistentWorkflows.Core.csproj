@@ -1,10 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
-	<PropertyGroup>
-		<PackageId>PersistentWorkflows</PackageId>
-		<Description>Durable, resumable workflow engine for .NET applications.</Description>
-	</PropertyGroup>
-
+<Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
@@ -14,5 +8,10 @@
   <ItemGroup>
     <ProjectReference Include="..\PersistentWorkflows.Abstractions\PersistentWorkflows.Abstractions.csproj" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Durable .NET workflow orchestration, recovery, scheduling, and hosting.</Description>
+  </PropertyGroup>
 
 </Project>

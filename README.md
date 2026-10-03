@@ -1,260 +1,133 @@
 # PersistentWorkflows
 
-Durable, resumable workflows for .NET applications.
+Durable sequential workflows for .NET 10 applications. Applications define actions; the engine persists unfinished work, schedules retries, and recovers abandoned execution.
 
-PersistentWorkflows helps you run multi-step business processes safely across application restarts, retries, failures, and distributed environments.
+Version `0.1.0-preview.2` is a preview. SQL Server is the packaged database provider. The relational store also has SQLite conformance tests; SQLite migrations and a standalone SQLite installation package are not shipped yet.
 
-Examples:
-- invoice processing
-- payment flows
-- customer onboarding
-- file processing
-- integrations with external systems
-- long-running background operations
+## Install one package
 
----
-
-# Features
-
-- Durable workflow execution
-- Persisted workflow state
-- Step-by-step execution history
-- Automatic resume support
-- Waiting and retry scheduling
-- Idempotent workflow start
-- Optimistic concurrency protection
-- Background workflow resumer
-- EF Core persistence provider
-- Code-first workflow definitions
-- Distributed-safe execution model
-
----
-
-# Installation
-
-```bash
-dotnet add package PersistentWorkflows
-dotnet add package PersistentWorkflows.EntityFrameworkCore
+```sh
+dotnet add package PersistentWorkflows.EntityFrameworkCore.SqlServer --version 0.1.0-preview.2
 ```
 
----
+NuGet brings in Core, Abstractions, and the EF store transitively. Consumers do not need four installation commands. Locally built packages can be installed from `artifacts/packages` before public publication.
 
-# Registration
+## Register and define work
 
-```csharp
-builder.Services.AddPersistentWorkflows();
-
-builder.Services.AddPersistentWorkflowsEntityFrameworkCore(options =>
-    options.UseSqlServer(connectionString));
-
-builder.Services.AddPersistentWorkflowsBackgroundResumer(options =>
-{
-    options.PollingInterval = TimeSpan.FromSeconds(15);
-    options.BatchSize = 100;
-});
-
-builder.Services.AddWorkflow<CreateInvoiceWorkflow, CreateInvoiceContext>();
-```
-
----
-
-# Define a workflow
+Create a .NET 10 console application, install the package above, and replace `Program.cs` with this example. Set `PERSISTENTWORKFLOWS_CONNECTION` to your SQL Server connection string before running it. The example applies migrations for local development, queues an order, records its approval, and runs the worker until you stop the application.
 
 ```csharp
-public sealed class CreateInvoiceWorkflow
-    : IWorkflowDefinition<CreateInvoiceContext>
-{
-    public string Name => "create-invoice";
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using PersistentWorkflows.Abstractions.Definitions;
+using PersistentWorkflows.Abstractions.Execution;
+using PersistentWorkflows.Abstractions.Results;
+using PersistentWorkflows.Core.DependencyInjection;
+using PersistentWorkflows.EntityFrameworkCore.SqlServer;
+using PersistentWorkflows.EntityFrameworkCore.Persistence;
 
-    public void Build(IWorkflowBuilder<CreateInvoiceContext> builder)
-    {
-        builder
-            .Step<ValidateCustomerStep>("validate-customer")
-            .Step<CreateCustomerStep>("create-customer")
-            .Step<CreateInvoiceStep>("create-invoice");
-    }
+var builder = Host.CreateApplicationBuilder(args);
+var connectionString = Environment.GetEnvironmentVariable("PERSISTENTWORKFLOWS_CONNECTION")
+    ?? throw new InvalidOperationException("Set PERSISTENTWORKFLOWS_CONNECTION first.");
+
+builder.Services.AddPersistentWorkflowsSqlServer(connectionString,
+    configureExecution: options => options.MaximumAttempts = 5,
+    configureWorker: options => options.MaximumConcurrency = 4);
+builder.Services.AddWorkflow<OrderWorkflow, OrderData>();
+builder.Services.AddScoped<ApproveOrder>();
+
+using var host = builder.Build();
+await host.Services.EnsurePersistentWorkflowsDatabaseAsync();
+
+await using (var scope = host.Services.CreateAsyncScope())
+{
+    var runner = scope.ServiceProvider.GetRequiredService<IWorkflowRunner>();
+    var accepted = await runner.EnqueueAsync<OrderWorkflow, OrderData>(
+        "order-123", new OrderData { OrderId = 123 });
+    await runner.SignalAsync(accepted.WorkflowInstanceId, "approval");
+    Console.WriteLine($"Accepted workflow: {accepted.WorkflowInstanceId}");
 }
-```
 
----
+await host.RunAsync();
 
-# Define workflow context
+public sealed class OrderData { public int OrderId { get; set; } }
 
-```csharp
-public sealed class CreateInvoiceContext
+public sealed class OrderWorkflow : IWorkflowDefinition<OrderData>
 {
-    public int ClientId { get; set; }
-
-    public string InvoiceNumber { get; set; } = string.Empty;
-
-    public Guid? CustomerId { get; set; }
+    public string Name => "order";
+    public int Version => 1;
+    public void Build(IWorkflowBuilder<OrderData> builder) =>
+        builder.Step<ApproveOrder>("approve");
 }
-```
 
----
-
-# Define a workflow step
-
-```csharp
-public sealed class CreateCustomerStep
-    : IWorkflowStep<CreateInvoiceContext>
+public sealed class ApproveOrder : IWorkflowStep<OrderData>
 {
     public async Task<StepResult> ExecuteAsync(
-        WorkflowExecutionContext<CreateInvoiceContext> context,
-        CancellationToken cancellationToken)
+        WorkflowExecutionContext<OrderData> context, CancellationToken ct)
     {
-        if (context.Data.CustomerId.HasValue)
-        {
-            return StepResult.Success();
-        }
-
-        var customerId = await CreateCustomer(cancellationToken);
-
-        context.Data.CustomerId = customerId;
-
-        return StepResult.Success();
-    }
-
-    private static Task<Guid> CreateCustomer(CancellationToken cancellationToken)
-    {
-        return Task.FromResult(Guid.NewGuid());
+        var approval = await context.GetSignalAsync("approval", ct);
+        return approval is null ? StepResult.WaitForSignal("approval") : StepResult.Success();
     }
 }
 ```
 
----
-
-# Start a workflow
+The example records approval before the worker starts; signals can also arrive while a workflow is waiting. In your application, resolve `IWorkflowRunner` from a service scope or request scope to enqueue work, send signals, or inspect its state:
 
 ```csharp
-await workflowRunner.StartAsync<CreateInvoiceWorkflow, CreateInvoiceContext>(
-    instanceKey: $"invoice-{invoiceId}",
-    context: new CreateInvoiceContext
-    {
-        ClientId = 100,
-        InvoiceNumber = "INV-1001"
-    });
+var accepted = await runner.EnqueueAsync<OrderWorkflow, OrderData>(
+    $"order-{orderId}", new() { OrderId = orderId }, cancellationToken);
+await runner.SignalAsync(accepted.WorkflowInstanceId, "approval", cancellationToken: cancellationToken);
+var state = await runner.GetAsync(accepted.WorkflowInstanceId, cancellationToken);
 ```
 
----
+`EnqueueAsync` persists work and returns immediately. `StartAsync` also attempts inline execution after creating an instance. An existing business key does not execute again through `StartAsync`; workers pick up unfinished instances. Different serialized initial input with the same workflow name and key raises `WorkflowInputConflictException`.
 
-# Wait and retry
+## Database setup
 
-Steps can pause execution and resume later.
+The SQL Server package contains the initial and durable-execution migrations. Deploy migrations before starting workers. For a local sample:
 
 ```csharp
-public sealed class WaitForPaymentStep
-    : IWorkflowStep<PaymentContext>
-{
-    public Task<StepResult> ExecuteAsync(
-        WorkflowExecutionContext<PaymentContext> context,
-        CancellationToken cancellationToken)
-    {
-        var paymentReceived = CheckPayment();
-
-        if (!paymentReceived)
-        {
-            return Task.FromResult(
-                StepResult.Wait(TimeSpan.FromMinutes(5)));
-        }
-
-        return Task.FromResult(StepResult.Success());
-    }
-
-    private static bool CheckPayment()
-    {
-        return false;
-    }
-}
+using PersistentWorkflows.EntityFrameworkCore.Persistence;
+await host.Services.EnsurePersistentWorkflowsDatabaseAsync();
 ```
 
----
+The runtime account needs normal data access; production schema changes should use a separately controlled deployment account. Moving migrations into the SQL Server assembly preserves their original migration IDs and history table. Existing instances upgrade with definition/context version 1; an old `Running` row without a lease becomes recoverable. Retain the original version 1 definition when upgrading.
 
-# Resume workflows manually
+## Guarantees and limits
 
-```csharp
-await workflowRunner.ResumeAsync(workflowInstanceId);
+- An accepted instance is durable. `Pending` instances and expired `Running` leases are discoverable by workers.
+- Steps execute sequentially. Each successful step advances its cursor in the same transaction that records its outcome and context.
+- Claims, renewals, and commits are fenced by an ownership token. Competing workers cannot independently commit progress under different tokens.
+- An interrupted action can execute again, so actions and their external effects may occur multiple times. Successful external effects are not guaranteed: permanent failures, exhausted retries, or cancellation can stop execution. Make external effects idempotent; the engine does not provide exactly-once external effects.
+- `context.IdempotencyKey` is stable across attempts. Pass it to external systems or use an application-side unique constraint/outbox and reconciliation.
+- A lease cannot stop an external request already in flight. Timeouts/cancellation are cooperative; an action that ignores cancellation may continue after the engine stops waiting. Its late result is discarded.
+- No distributed transaction, automatic compensation, parallel branches, or child-workflow orchestration is provided in this preview.
+- Work progresses while a worker is running and its database is available. Terminal failures need explicit intervention; indefinite waits need a signal or manual resume.
+
+See [USAGE.md](https://github.com/Sasanrf/PersistentWorkflows/blob/main/USAGE.md) for policies, operational APIs, versioning, and examples, and [docs/ARCHITECTURE.md](https://github.com/Sasanrf/PersistentWorkflows/blob/main/docs/ARCHITECTURE.md) for provider requirements.
+
+## Examples and validation
+
+Clone the [source repository](https://github.com/Sasanrf/PersistentWorkflows) and run these commands from its root directory. The sample projects and test suite are provided in the repository.
+
+```sh
+dotnet run --project PersistentWorkflows.Sample.Console
+dotnet run --project PersistentWorkflows.Sample.Web --urls http://localhost:5080
+dotnet test PersistentWorkflows.slnx
+dotnet pack PersistentWorkflows.slnx --configuration Release --output artifacts/packages
 ```
 
----
+Samples use dedicated sample databases on `localhost\SQLEXPRESS`. Override `PERSISTENTWORKFLOWS_CONNECTION` to select your database. The console starts a real hosted worker and demonstrates timer waiting; the web sample accepts orders and approval signals. Web endpoints are local demonstrations; integrate your application's authentication and authorization before deployment.
 
-# Automatic background resume
+SQL Server conformance tests are opt-in through `PERSISTENTWORKFLOWS_TEST_SQLSERVER`. They create unique `PersistentWorkflowsTests_*` databases and delete only those databases. The supplied connection account must be permitted to create test databases. SQLite tests use temporary files and independent sessions.
 
-```csharp
-builder.Services.AddPersistentWorkflowsBackgroundResumer(options =>
-{
-    options.PollingInterval = TimeSpan.FromSeconds(30);
-    options.BatchSize = 100;
-});
-```
+## Package boundaries
 
----
+| Package | Responsibility |
+|---|---|
+| PersistentWorkflows.Abstractions | Public definition, result, serialization, and persistence contracts |
+| PersistentWorkflows.Core | Orchestration, policies, hosting, registry, and diagnostics |
+| PersistentWorkflows.EntityFrameworkCore | Relational atomic persistence operations |
+| PersistentWorkflows.EntityFrameworkCore.SqlServer | SQL Server dependencies, registration, and migrations |
 
-# Execution guarantees
-
-PersistentWorkflows guarantees:
-
-- Persisted workflow progress
-- Persisted workflow step history
-- Sequential step execution
-- Idempotent workflow creation by workflow name + instance key
-- Optimistic concurrency protection
-- Safe workflow resume after application restart
-
----
-
-# Important limitations
-
-PersistentWorkflows does NOT guarantee:
-
-- Distributed transactions
-- Exactly-once external API calls
-- Automatic compensation/rollback
-- Automatic idempotency inside workflow steps
-
-Workflow steps should be designed to be idempotent whenever possible.
-
----
-
-# Recommended usage
-
-PersistentWorkflows works best for:
-
-- Long-running business processes
-- Retryable external integrations
-- Background processing
-- Durable orchestration
-- Distributed application workflows
-
----
-
-# Architecture
-
-```text
-PersistentWorkflows.Abstractions
-PersistentWorkflows.Core
-PersistentWorkflows.EntityFrameworkCore
-```
-
-Additional providers and integrations can be added independently.
-
----
-
-# Current status
-
-Current implementation includes:
-
-- Workflow engine
-- EF Core persistence provider
-- Background workflow resumer
-- SQLite integration tests
-- Optimistic concurrency handling
-
-Future improvements may include:
-
-- OpenTelemetry integration
-- Retry policies
-- Workflow querying APIs
-- Saga compensation support
-- Additional persistence providers
-- Dashboard/monitoring support
+Additional providers implement `IWorkflowStore` and run the provider conformance suite. Core has no EF dependency. See [docs/RELEASE.md](https://github.com/Sasanrf/PersistentWorkflows/blob/main/docs/RELEASE.md) for preview packaging and publication checks.

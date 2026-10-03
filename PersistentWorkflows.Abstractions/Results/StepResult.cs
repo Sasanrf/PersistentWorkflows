@@ -8,6 +8,14 @@ public sealed class StepResult
     public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
     public TimeSpan? RetryAfter { get; init; }
+    public string? SignalName { get; init; }
+
+    public static StepResult WaitForSignal(string signalName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(signalName);
+        if (signalName.Length > 200) throw new ArgumentOutOfRangeException(nameof(signalName));
+        return new() { Status = StepExecutionStatus.Waiting, SignalName = signalName };
+    }
 
     public static StepResult Success() =>
         new() { Status = StepExecutionStatus.Succeeded };

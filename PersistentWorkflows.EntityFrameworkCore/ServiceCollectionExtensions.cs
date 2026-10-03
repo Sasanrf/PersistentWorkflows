@@ -18,6 +18,8 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IWorkflowInstanceRepository, WorkflowInstanceRepository>();
         services.AddScoped<IWorkflowStepExecutionRepository, WorkflowStepExecutionRepository>();
+        services.AddScoped<IWorkflowUnitOfWork, WorkflowUnitOfWork>();
+        services.AddScoped<IWorkflowStore, EfWorkflowStore>();
 
         return services;
     }

@@ -8,5 +8,7 @@
   <Project Path="PersistentWorkflows.Core/PersistentWorkflows.Core.csproj" />
   <Project Path="PersistentWorkflows.EntityFrameworkCore.Tests/PersistentWorkflows.EntityFrameworkCore.Tests.csproj" />
   <Project Path="PersistentWorkflows.EntityFrameworkCore/PersistentWorkflows.EntityFrameworkCore.csproj" />
+  <Project Path="PersistentWorkflows.EntityFrameworkCore.SqlServer/PersistentWorkflows.EntityFrameworkCore.SqlServer.csproj" />
+  <Project Path="PersistentWorkflows.Sample.Web/PersistentWorkflows.Sample.Web.csproj" />
   <Project Path="PersistentWorkflows.Sample.Console/PersistentWorkflows.Sample.Console.csproj" Id="720d0bea-7c8d-4d92-9de0-0edae8103f58" />
 </Solution>

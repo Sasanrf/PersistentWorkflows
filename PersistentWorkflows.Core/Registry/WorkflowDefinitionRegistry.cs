@@ -1,70 +1,42 @@
-﻿using PersistentWorkflows.Core.Definitions;
+using PersistentWorkflows.Core.Definitions;
 
 namespace PersistentWorkflows.Core.Registry;
 
 internal sealed class WorkflowDefinitionRegistry : IWorkflowDefinitionRegistry
 {
-    private readonly Dictionary<Type, WorkflowDefinitionDescriptor> _descriptorsByType = new();
-    private readonly Dictionary<string, WorkflowDefinitionDescriptor> _descriptorsByName =
-        new(StringComparer.OrdinalIgnoreCase);
-
+    private readonly Dictionary<Type, WorkflowDefinitionDescriptor> _byType = [];
+    private readonly Dictionary<string, WorkflowDefinitionDescriptor> _byVersion = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _gate = new();
+    private static string Key(string name, int version) => $"{name}/{version}";
     public void Register(WorkflowDefinitionDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-
-        if (_descriptorsByType.ContainsKey(descriptor.WorkflowType))
+        lock (_gate)
         {
-            throw new InvalidOperationException(
-                $"Workflow '{descriptor.WorkflowType.FullName}' is already registered.");
+            if (_byType.ContainsKey(descriptor.WorkflowType) || _byVersion.ContainsKey(Key(descriptor.Name, descriptor.Version)))
+                throw new InvalidOperationException($"Workflow '{descriptor.Name}' version {descriptor.Version} is already registered.");
+            _byType.Add(descriptor.WorkflowType, descriptor);
+            _byVersion.Add(Key(descriptor.Name, descriptor.Version), descriptor);
         }
-
-        if (_descriptorsByName.ContainsKey(descriptor.Name))
+    }
+    public WorkflowDefinitionDescriptor Get(Type type) => TryGet(type, out var descriptor) ? descriptor! : throw new InvalidOperationException($"Workflow '{type}' is not registered.");
+    public bool TryGet(Type type, out WorkflowDefinitionDescriptor? descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        lock (_gate) return _byType.TryGetValue(type, out descriptor);
+    }
+    public WorkflowDefinitionDescriptor GetByName(string name) => TryGetByName(name, out var descriptor) ? descriptor! : throw new InvalidOperationException($"Workflow '{name}' is not registered.");
+    public bool TryGetByName(string name, out WorkflowDefinitionDescriptor? descriptor)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        lock (_gate)
         {
-            throw new InvalidOperationException(
-                $"Workflow name '{descriptor.Name}' is already registered.");
+            descriptor = _byVersion.Values.Where(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)).OrderByDescending(x => x.Version).FirstOrDefault();
+            return descriptor is not null;
         }
-
-        _descriptorsByType[descriptor.WorkflowType] = descriptor;
-        _descriptorsByName[descriptor.Name] = descriptor;
     }
-
-    public WorkflowDefinitionDescriptor Get(Type workflowType)
+    public WorkflowDefinitionDescriptor GetByName(string name, int version)
     {
-        ArgumentNullException.ThrowIfNull(workflowType);
-
-        if (!_descriptorsByType.TryGetValue(workflowType, out var descriptor))
-        {
-            throw new InvalidOperationException(
-                $"Workflow '{workflowType.FullName}' is not registered.");
-        }
-
-        return descriptor;
-    }
-
-    public bool TryGet(Type workflowType, out WorkflowDefinitionDescriptor? descriptor)
-    {
-        ArgumentNullException.ThrowIfNull(workflowType);
-
-        return _descriptorsByType.TryGetValue(workflowType, out descriptor);
-    }
-
-    public WorkflowDefinitionDescriptor GetByName(string workflowName)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(workflowName);
-
-        if (!_descriptorsByName.TryGetValue(workflowName, out var descriptor))
-        {
-            throw new InvalidOperationException(
-                $"Workflow name '{workflowName}' is not registered.");
-        }
-
-        return descriptor;
-    }
-
-    public bool TryGetByName(string workflowName, out WorkflowDefinitionDescriptor? descriptor)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(workflowName);
-
-        return _descriptorsByName.TryGetValue(workflowName, out descriptor);
+        lock (_gate) return _byVersion.TryGetValue(Key(name, version), out var descriptor) ? descriptor : throw new InvalidOperationException($"Workflow '{name}' version {version} is not registered.");
     }
 }

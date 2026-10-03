@@ -164,6 +164,8 @@ public sealed class WorkflowRunnerPersistenceTests : IDisposable
 
         await runner.ResumeAsync(startResult.WorkflowInstanceId);
 
+        dbContext.ChangeTracker.Clear();
+
         var resumedInstance = await dbContext.WorkflowInstances.SingleAsync();
 
         resumedInstance.Status.Should().Be("Succeeded");

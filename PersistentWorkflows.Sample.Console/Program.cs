@@ -1,113 +1,51 @@
-﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using PersistentWorkflows.Abstractions.Definitions;
 using PersistentWorkflows.Abstractions.Execution;
 using PersistentWorkflows.Abstractions.Results;
 using PersistentWorkflows.Core.DependencyInjection;
-using PersistentWorkflows.Core.Execution;
-using PersistentWorkflows.EntityFrameworkCore;
+using PersistentWorkflows.EntityFrameworkCore.SqlServer;
 using PersistentWorkflows.EntityFrameworkCore.Persistence;
-using Microsoft.EntityFrameworkCore.SqlServer;
 
 var builder = Host.CreateApplicationBuilder(args);
-builder.Logging.ClearProviders();
-builder.Services.AddPersistentWorkflows();
-
-builder.Services.AddPersistentWorkflowsEntityFrameworkCore(options =>
-{
-    options.UseSqlServer(
-        "Server=localhost;Database=Parking;Trusted_Connection=True;TrustServerCertificate=True;");
-});
-
-builder.Services.AddPersistentWorkflowsBackgroundResumer(options =>
-{
-    options.PollingInterval = TimeSpan.FromSeconds(5);
-    options.BatchSize = 10;
-});
-
+var connection = Environment.GetEnvironmentVariable("PERSISTENTWORKFLOWS_CONNECTION")
+    ?? "Server=localhost\\SQLEXPRESS;Database=PersistentWorkflowsSample;Trusted_Connection=True;TrustServerCertificate=True;";
+builder.Services.AddPersistentWorkflowsSqlServer(connection, configureWorker: o => o.PollingInterval = TimeSpan.FromSeconds(1));
 builder.Services.AddWorkflow<CreateInvoiceWorkflow, CreateInvoiceContext>();
-
 builder.Services.AddScoped<ValidateCustomerStep>();
 builder.Services.AddScoped<WaitForExternalApprovalStep>();
 builder.Services.AddScoped<CreateInvoiceStep>();
-
 using var host = builder.Build();
-
 await host.Services.EnsurePersistentWorkflowsDatabaseAsync();
-
-Guid workflowInstanceId;
-
-using (var scope = host.Services.CreateScope())
+await host.StartAsync();
+try
 {
-    var runner = scope.ServiceProvider.GetRequiredService<IWorkflowRunner>();
-
-    var result = await runner.StartAsync<CreateInvoiceWorkflow, CreateInvoiceContext>(
-        instanceKey: $"invoice-{Guid.NewGuid()}",
-        context: new CreateInvoiceContext
-        {
-            ClientId = 100,
-            InvoiceNumber = "INV-1001"
-        });
-    workflowInstanceId = result.WorkflowInstanceId;
-    Console.WriteLine($"Started workflow: {result.WorkflowInstanceId}");
-    Console.WriteLine($"Already exists: {result.AlreadyExists}");
-}
-
-using (var scope = host.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<PersistentWorkflowsDbContext>();
-
-    var instance = await dbContext.WorkflowInstances
-        .SingleAsync(x => x.Id == workflowInstanceId);
-
-    Console.WriteLine();
-    Console.WriteLine("After start:");
-    Console.WriteLine($"Status: {instance.Status}");
-    Console.WriteLine($"Current step index: {instance.CurrentStepIndex}");
-
-    instance.NextExecutionAtUtc = DateTime.UtcNow.AddSeconds(-1);
-    await dbContext.SaveChangesAsync();
-}
-
-using (var scope = host.Services.CreateScope())
-{
-    var runner = scope.ServiceProvider.GetRequiredService<IWorkflowRunner>();
-    var dbContext = scope.ServiceProvider.GetRequiredService<PersistentWorkflowsDbContext>();
-
-    var instance = await dbContext.WorkflowInstances
-        .SingleAsync(x => x.Id == workflowInstanceId);
-
-    await runner.ResumeAsync(instance.Id, CancellationToken.None);
-}
-
-using (var scope = host.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<PersistentWorkflowsDbContext>();
-
-    var instance = await dbContext.WorkflowInstances
-        .SingleAsync(x => x.Id == workflowInstanceId);
-    var steps = await dbContext.WorkflowStepExecutions
-        .Where(x => x.WorkflowInstanceId == workflowInstanceId)
-        .OrderBy(x => x.StartedAtUtc)
-        .ThenBy(x => x.Attempt)
-        .ToListAsync();
-
-    Console.WriteLine();
-    Console.WriteLine("After resume:");
-    Console.WriteLine($"Status: {instance.Status}");
-    Console.WriteLine($"Current step index: {instance.CurrentStepIndex}");
-
-    Console.WriteLine();
-    Console.WriteLine("Step executions:");
-
-    foreach (var step in steps)
+    Guid id;
+    await using (var scope = host.Services.CreateAsyncScope())
     {
-        Console.WriteLine(
-            $"{step.StepName} | {step.Status} | Attempt {step.Attempt}");
+        var runner = scope.ServiceProvider.GetRequiredService<IWorkflowRunner>();
+        var result = await runner.EnqueueAsync<CreateInvoiceWorkflow, CreateInvoiceContext>(
+            $"invoice-{Guid.NewGuid():N}", new() { ClientId = 100, InvoiceNumber = "INV-1001" });
+        id = result.WorkflowInstanceId;
+        Console.WriteLine($"Accepted workflow: {id} ({result.Status})");
+    }
+    using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+    while (true)
+    {
+        await using var scope = host.Services.CreateAsyncScope();
+        var runner = scope.ServiceProvider.GetRequiredService<IWorkflowRunner>();
+        var instance = (await runner.GetAsync(id, deadline.Token))!;
+        if (instance.Status is "Succeeded" or "Failed" or "Cancelled")
+        {
+            Console.WriteLine($"Final status: {instance.Status}");
+            foreach (var step in await runner.GetHistoryAsync(id, cancellationToken: deadline.Token))
+                Console.WriteLine($"{step.StepName} | {step.Status} | Attempt {step.Attempt}");
+            break;
+        }
+        await Task.Delay(TimeSpan.FromMilliseconds(250), deadline.Token);
     }
 }
+finally { await host.StopAsync(); }
 
 public sealed class CreateInvoiceContext
 {

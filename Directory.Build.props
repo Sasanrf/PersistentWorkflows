@@ -10,6 +10,14 @@
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageTags>workflow;durable-workflows;dotnet;ef-core;orchestration</PackageTags>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
-		<Version>0.1.0-preview.1</Version>
+		<Version>0.1.0-preview.2</Version>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<RepositoryType>git</RepositoryType>
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<IncludeSymbols>true</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 	</PropertyGroup>
+    <ItemGroup>
+        <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" />
+    </ItemGroup>
 </Project>

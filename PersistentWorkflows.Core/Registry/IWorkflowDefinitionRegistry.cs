@@ -13,4 +13,5 @@ internal interface IWorkflowDefinitionRegistry
     WorkflowDefinitionDescriptor GetByName(string workflowName);
 
     bool TryGetByName(string workflowName, out WorkflowDefinitionDescriptor? descriptor);
+    WorkflowDefinitionDescriptor GetByName(string workflowName, int version);
 }

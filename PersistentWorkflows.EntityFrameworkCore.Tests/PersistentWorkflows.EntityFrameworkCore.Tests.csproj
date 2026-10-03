@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="FluentAssertions" Version="8.10.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
@@ -23,6 +24,7 @@
     <ProjectReference Include="..\PersistentWorkflows.Abstractions\PersistentWorkflows.Abstractions.csproj" />
     <ProjectReference Include="..\PersistentWorkflows.Core\PersistentWorkflows.Core.csproj" />
     <ProjectReference Include="..\PersistentWorkflows.EntityFrameworkCore\PersistentWorkflows.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\PersistentWorkflows.EntityFrameworkCore.SqlServer\PersistentWorkflows.EntityFrameworkCore.SqlServer.csproj" />
   </ItemGroup>
 	
 </Project>

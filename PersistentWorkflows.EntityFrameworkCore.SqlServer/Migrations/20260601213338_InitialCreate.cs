@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace PersistentWorkflows.EntityFrameworkCore.Migrations
+namespace PersistentWorkflows.EntityFrameworkCore.SqlServer.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -96,3 +96,4 @@ namespace PersistentWorkflows.EntityFrameworkCore.Migrations
         }
     }
 }
+

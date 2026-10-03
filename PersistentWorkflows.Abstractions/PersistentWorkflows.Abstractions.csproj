@@ -1,8 +1,6 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
-	<PropertyGroup>
-		<PackageId>PersistentWorkflows.Abstractions</PackageId>
-		<Description>Abstractions for defining durable, resumable workflows in .NET.</Description>
-	</PropertyGroup>
-
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Provider-neutral contracts for durable .NET workflows.</Description>
+  </PropertyGroup>
 </Project>

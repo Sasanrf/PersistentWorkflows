@@ -12,6 +12,7 @@
     <ProjectReference Include="..\PersistentWorkflows.Abstractions\PersistentWorkflows.Abstractions.csproj" />
     <ProjectReference Include="..\PersistentWorkflows.Core\PersistentWorkflows.Core.csproj" />
     <ProjectReference Include="..\PersistentWorkflows.EntityFrameworkCore\PersistentWorkflows.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\PersistentWorkflows.EntityFrameworkCore.SqlServer\PersistentWorkflows.EntityFrameworkCore.SqlServer.csproj" />
   </ItemGroup>
 
 	<ItemGroup>
@@ -19,7 +20,6 @@
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.8" />
 	</ItemGroup>
 

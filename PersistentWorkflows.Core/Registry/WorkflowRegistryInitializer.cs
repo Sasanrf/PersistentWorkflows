@@ -9,7 +9,9 @@ internal sealed class WorkflowRegistryInitializer : IWorkflowRegistryInitializer
     private readonly PersistentWorkflowsOptions _options;
     private readonly IWorkflowDefinitionFactory _factory;
     private readonly IWorkflowDefinitionRegistry _registry;
-    private int _initialized;
+    private readonly SemaphoreSlim _initialization = new(1, 1);
+
+    private volatile bool _initialized;
 
     public WorkflowRegistryInitializer(
         IOptions<PersistentWorkflowsOptions> options,
@@ -22,19 +24,41 @@ internal sealed class WorkflowRegistryInitializer : IWorkflowRegistryInitializer
     }
 
     public void Initialize()
+        => InitializeAsync().GetAwaiter().GetResult();
+
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        if (Interlocked.Exchange(ref _initialized, 1) == 1)
+        if (_initialized)
         {
             return;
         }
 
-        foreach (var registration in _options.Registrations)
+        await _initialization.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            var descriptor = _factory.Create(
-                registration.WorkflowType,
-                registration.ContextType);
+            if (_initialized)
+            {
+                return;
+            }
 
-            _registry.Register(descriptor);
+            var descriptors = new List<WorkflowDefinitionDescriptor>();
+            foreach (var registration in _options.Registrations)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                descriptors.Add(await _factory.CreateAsync(registration.WorkflowType, registration.ContextType).ConfigureAwait(false));
+            }
+
+            if (descriptors.GroupBy(x => x.WorkflowType).Any(x => x.Count() > 1) ||
+                descriptors.GroupBy(x => $"{x.Name}/{x.Version}", StringComparer.OrdinalIgnoreCase).Any(x => x.Count() > 1))
+                throw new InvalidOperationException("Duplicate workflow definition registration.");
+
+            foreach (var descriptor in descriptors)
+            {
+                _registry.Register(descriptor);
+            }
+
+            _initialized = true;
         }
+        finally { _initialization.Release(); }
     }
 }

@@ -148,6 +148,7 @@ public sealed class WorkflowRunnerTests
         services.AddSingleton<IWorkflowContextSerializer, SystemTextJsonWorkflowContextSerializer>();
 
         services.AddPersistentWorkflows();
+        services.AddSingleton<IWorkflowStore, FakeWorkflowStore>();
 
         configureServices(services);
 

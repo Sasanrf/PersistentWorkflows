@@ -1,93 +1,54 @@
-﻿using PersistentWorkflows.Abstractions.Definitions;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
+using Microsoft.Extensions.DependencyInjection;
+using PersistentWorkflows.Abstractions.Definitions;
 
 namespace PersistentWorkflows.Core.Definitions;
 
-internal sealed class WorkflowDefinitionFactory : IWorkflowDefinitionFactory
+internal sealed class WorkflowDefinitionFactory(IServiceProvider serviceProvider) : IWorkflowDefinitionFactory
 {
-    private readonly IServiceProvider _serviceProvider;
-
-    public WorkflowDefinitionFactory(IServiceProvider serviceProvider)
-    {
-        _serviceProvider = serviceProvider;
-    }
-
     public WorkflowDefinitionDescriptor Create(Type workflowType, Type contextType)
+        => CreateAsync(workflowType, contextType).GetAwaiter().GetResult();
+
+    public async Task<WorkflowDefinitionDescriptor> CreateAsync(Type workflowType, Type contextType)
     {
         ArgumentNullException.ThrowIfNull(workflowType);
         ArgumentNullException.ThrowIfNull(contextType);
-
-        var workflow = _serviceProvider.GetService(workflowType);
-
-        if (workflow is null)
+        if (!typeof(IWorkflowDefinition<>).MakeGenericType(contextType).IsAssignableFrom(workflowType))
+            throw new InvalidOperationException($"Workflow '{workflowType.FullName}' does not implement the requested definition interface.");
+        try
         {
-            throw new InvalidOperationException(
-                $"Workflow '{workflowType.FullName}' is not registered in the service provider.");
+            return await ((Task<WorkflowDefinitionDescriptor>)typeof(WorkflowDefinitionFactory)
+                .GetMethod(nameof(CreateTyped), BindingFlags.NonPublic | BindingFlags.Instance)!
+                .MakeGenericMethod(contextType).Invoke(this, [workflowType])!).ConfigureAwait(false);
         }
-
-        var workflowInterface = typeof(IWorkflowDefinition<>).MakeGenericType(contextType);
-
-        if (!workflowInterface.IsAssignableFrom(workflowType))
+        catch (TargetInvocationException ex) when (ex.InnerException is not null)
         {
-            throw new InvalidOperationException(
-                $"Workflow '{workflowType.FullName}' does not implement IWorkflowDefinition<{contextType.Name}>.");
+            ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            throw;
         }
+    }
 
-        var nameProperty = workflowType.GetProperty(nameof(IWorkflowDefinition<object>.Name));
-
-        if (nameProperty is null)
+    private async Task<WorkflowDefinitionDescriptor> CreateTyped<TContext>(Type workflowType) where TContext : class
+    {
+        var scope = serviceProvider.CreateAsyncScope();
+        await using (scope.ConfigureAwait(false))
         {
-            throw new InvalidOperationException(
-                $"Workflow '{workflowType.FullName}' must expose a Name property.");
+            var workflow = scope.ServiceProvider.GetService(workflowType) as IWorkflowDefinition<TContext>
+                ?? throw new InvalidOperationException($"Workflow '{workflowType.FullName}' is not registered in the service provider.");
+            if (string.IsNullOrWhiteSpace(workflow.Name) || workflow.Name.Length > 200)
+                throw new InvalidOperationException($"Workflow '{workflowType.FullName}' must have a non-empty name of at most 200 characters.");
+            if (workflow.Version < 1 || workflow.ContextSchemaVersion < 1)
+                throw new InvalidOperationException("Definition and context schema versions must be positive.");
+            var builder = new WorkflowBuilder<TContext>();
+            workflow.Build(builder);
+            var steps = builder.Build();
+            if (steps.Count == 0) throw new InvalidOperationException($"Workflow '{workflowType.FullName}' must define at least one step.");
+            return new WorkflowDefinitionDescriptor
+            {
+                Name = workflow.Name, WorkflowType = workflowType, ContextType = typeof(TContext),
+                Steps = steps.ToArray(), Version = workflow.Version, ContextSchemaVersion = workflow.ContextSchemaVersion
+            };
         }
-
-        var workflowName = nameProperty.GetValue(workflow) as string;
-
-        if (string.IsNullOrWhiteSpace(workflowName))
-        {
-            throw new InvalidOperationException(
-                $"Workflow '{workflowType.FullName}' must have a non-empty name.");
-        }
-
-        var builderType = typeof(WorkflowBuilder<>).MakeGenericType(contextType);
-        var builder = Activator.CreateInstance(builderType);
-
-        if (builder is null)
-        {
-            throw new InvalidOperationException(
-                $"Failed to create workflow builder for context type '{contextType.FullName}'.");
-        }
-
-        var buildMethod = workflowType.GetMethod(nameof(IWorkflowDefinition<object>.Build));
-
-        if (buildMethod is null)
-        {
-            throw new InvalidOperationException(
-                $"Workflow '{workflowType.FullName}' must define a Build method.");
-        }
-
-        buildMethod.Invoke(workflow, new[] { builder });
-
-        var stepsMethod = builderType.GetMethod(nameof(WorkflowBuilder<object>.Build));
-
-        if (stepsMethod is null)
-        {
-            throw new InvalidOperationException("Failed to access workflow builder result.");
-        }
-
-        var steps = stepsMethod.Invoke(builder, null) as IReadOnlyList<WorkflowStepDefinition>;
-
-        if (steps is null || steps.Count == 0)
-        {
-            throw new InvalidOperationException(
-                $"Workflow '{workflowType.FullName}' must define at least one step.");
-        }
-
-        return new WorkflowDefinitionDescriptor
-        {
-            Name = workflowName,
-            WorkflowType = workflowType,
-            ContextType = contextType,
-            Steps = steps
-        };
     }
 }
