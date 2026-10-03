@@ -9,7 +9,7 @@ Additional provider -----------------------------> Core + Abstractions
 
 Abstractions contains no EF types. Core contains no database references. The SQL Server assembly owns its migrations and database dependencies. `IWorkflowStore` describes guarantees; future providers may implement it without EF.
 
-Definitions are built through typed interface adapters inside a scope. The registry validates duplicate type/name/version registrations before publishing configured definitions. Explicit interface implementations are supported. Host startup validates registered definitions, step resolution, persistence availability, and policy settings. Non-hosted start/resume also initialize definitions.
+Definitions are built through typed interface adapters inside a scope. The registry validates duplicate type/name/version registrations before publishing configured definitions. Explicit interface implementations are supported. Host startup validates registered definitions, step resolution, store service resolution, and policy settings. Resolving the store does not verify database connectivity or whether migrations have been applied; deploy migrations and check database readiness separately. Non-hosted start/resume also initialize definitions.
 
 ## State machine
 

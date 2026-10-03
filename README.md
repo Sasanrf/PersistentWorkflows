@@ -102,7 +102,7 @@ The runtime account needs normal data access; production schema changes should u
 - `context.IdempotencyKey` is stable across attempts. Pass it to external systems or use an application-side unique constraint/outbox and reconciliation.
 - A lease cannot stop an external request already in flight. Timeouts/cancellation are cooperative; an action that ignores cancellation may continue after the engine stops waiting. Its late result is discarded.
 - No distributed transaction, automatic compensation, parallel branches, or child-workflow orchestration is provided in this preview.
-- Work progresses while a worker is running and its database is available. Terminal failures need explicit intervention; indefinite waits need a signal or manual resume.
+- Work progresses while a worker is running and its database is available. Terminal failures need explicit intervention. An unnamed indefinite wait (`StepResult.Wait()`) requires manual resume; a named signal wait (`StepResult.WaitForSignal(name)`) resumes when that signal is available or through manual resume.
 
 See [USAGE.md](https://github.com/Sasanrf/PersistentWorkflows/blob/main/USAGE.md) for policies, operational APIs, versioning, and examples, and [docs/ARCHITECTURE.md](https://github.com/Sasanrf/PersistentWorkflows/blob/main/docs/ARCHITECTURE.md) for provider requirements.
 

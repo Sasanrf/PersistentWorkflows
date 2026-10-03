@@ -1,5 +1,7 @@
 # Usage
 
+The snippets below build on the complete console quickstart in [README.md](https://github.com/Sasanrf/PersistentWorkflows/blob/main/README.md). They reuse its registrations, workflow types, and imports. Supply your own connection string and resolve `runner` from a service scope; `id` identifies an existing workflow instance and cancellation tokens come from your caller or host. These snippets illustrate individual operations rather than standalone programs.
+
 ## Choose execution mode
 
 `EnqueueAsync<TWorkflow,TContext>` durably accepts work without executing application actions on the caller. Use it in web requests and for background jobs. `StartAsync` creates work and attempts execution inline, returning its current status; it may return `Waiting` or `Failed`. Neither method promises that acceptance means completion.
@@ -68,6 +70,12 @@ await runner.SignalAsync(id, "approval", "{\"approved\":true}", cancellationToke
 Each signal name identifies one immutable receipt per workflow instance. The first payload wins; duplicate delivery returns `false`. A null payload is still a received signal. Signals may arrive before the workflow waits. In an action, use `await context.GetSignalAsync(name, ct)` to distinguish absence from a null payload and read early signals. Receipts are retained until instance cleanup, so different steps may observe the same signal. Use distinct names for distinct events; this is a one-shot inbox, not a streaming event queue. Signals require an existing workflow ID.
 
 ## Query, cancel, recover, and clean up
+
+Add this namespace for the typed status enum:
+
+```csharp
+using PersistentWorkflows.Abstractions.Enums;
+```
 
 ```csharp
 var state = await runner.GetAsync(id, ct);
