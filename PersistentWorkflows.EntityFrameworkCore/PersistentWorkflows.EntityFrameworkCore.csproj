@@ -2,6 +2,8 @@
 
 	<PropertyGroup>
 		<PackageId>PersistentWorkflows.EntityFrameworkCore</PackageId>
+        <EnablePackageValidation>true</EnablePackageValidation>
+        <PackageValidationBaselineVersion>0.1.0-preview.2</PackageValidationBaselineVersion>
 		<Description>Relational EF Core persistence operations for durable .NET workflows.</Description>
 	</PropertyGroup>
 

@@ -55,6 +55,6 @@ The legacy repository and unit-of-work interfaces remain for compatibility. Appl
 
 Run the abstract `WorkflowStoreConformanceTests` suite against each provider using independent database sessions. SQLite exercises the relational contract with temporary file databases. Opt-in SQL Server tests exercise actual migrations, concurrent sessions, recovery, cancellation fencing, signals, retention, and upgrade of legacy instances. New providers must add their own tests and migrations, rather than inheriting SQL Server schema assumptions.
 
-## Preview scope
+## Version 1.0 scope
 
 Sequential actions, timers, one-shot signals, durable cancellation, retries, manual recovery, and versioned definitions are implemented. Compensation, parallel branches, child workflows, multi-language workers, dashboard UI, and automatic application-effect/engine-checkpoint enlistment are separate future capabilities.

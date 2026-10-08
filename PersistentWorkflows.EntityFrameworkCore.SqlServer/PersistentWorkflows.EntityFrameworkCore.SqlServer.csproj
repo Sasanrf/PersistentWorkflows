@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>PersistentWorkflows.EntityFrameworkCore.SqlServer</PackageId>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>0.1.0-preview.2</PackageValidationBaselineVersion>
     <Description>Durable workflows for .NET with SQL Server persistence, migrations, and background execution.</Description>
   </PropertyGroup>
   <ItemGroup>

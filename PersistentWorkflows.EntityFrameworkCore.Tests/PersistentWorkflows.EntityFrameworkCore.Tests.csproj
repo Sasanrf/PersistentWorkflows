@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\validation\FailureWorker\FailureWorker.csproj" />
     <PackageReference Include="FluentAssertions" Version="8.10.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
@@ -26,5 +27,11 @@
     <ProjectReference Include="..\PersistentWorkflows.EntityFrameworkCore\PersistentWorkflows.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\PersistentWorkflows.EntityFrameworkCore.SqlServer\PersistentWorkflows.EntityFrameworkCore.SqlServer.csproj" />
   </ItemGroup>
-	
+  <Target Name="CopyFailureWorker" AfterTargets="Build">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../validation/FailureWorker/bin/$(Configuration)/$(TargetFramework)/FailureWorker.dll')" Text="FailureWorker must be built in $(Configuration) before copying the crash-test process. Include it in the solution configuration." />
+    <ItemGroup>
+      <FailureWorkerFiles Include="$(MSBuildProjectDirectory)/../validation/FailureWorker/bin/$(Configuration)/$(TargetFramework)/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FailureWorkerFiles)" DestinationFiles="@(FailureWorkerFiles->'$(OutDir)failure-worker/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
