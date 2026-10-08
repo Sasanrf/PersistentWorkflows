@@ -14,14 +14,15 @@ using Xunit;
 
 namespace PersistentWorkflows.EntityFrameworkCore.Tests.Execution;
 
-public sealed class DurableWorkflowTests : IAsyncLifetime
+public class DurableWorkflowTests : IAsyncLifetime
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"durable-tests-{Guid.NewGuid():N}.db");
+    protected virtual void ConfigureDatabase(DbContextOptionsBuilder options) => options.UseSqlite($"Data Source={_path};Pooling=False");
     private ServiceProvider Provider(Action<PersistentWorkflowsOptions>? policy = null, Action<IServiceCollection>? configure = null)
     {
         var services = new ServiceCollection();
         services.AddPersistentWorkflows(policy);
-        services.AddPersistentWorkflowsEntityFrameworkCore(o => o.UseSqlite($"Data Source={_path};Pooling=False"));
+        services.AddPersistentWorkflowsEntityFrameworkCore(ConfigureDatabase);
         services.AddPersistentWorkflowsBackgroundResumer();
         services.AddWorkflow<TestWorkflow, Data>();
         services.AddScoped<ActionStep>();
@@ -30,13 +31,13 @@ public sealed class DurableWorkflowTests : IAsyncLifetime
         configure?.Invoke(services);
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
     }
-    public async ValueTask InitializeAsync()
+    public virtual async ValueTask InitializeAsync()
     {
         await using var provider = Provider();
         await using var scope = provider.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<PersistentWorkflowsDbContext>().Database.EnsureCreatedAsync();
     }
-    public ValueTask DisposeAsync() { File.Delete(_path); return ValueTask.CompletedTask; }
+    public virtual ValueTask DisposeAsync() { File.Delete(_path); return ValueTask.CompletedTask; }
     [Fact]
     public async Task EnqueuedWorkRunsAfterACompleteProviderRestart()
     {
@@ -294,7 +295,7 @@ public sealed class DurableWorkflowTests : IAsyncLifetime
         Assert.Equal(WorkflowStatus.Failed, result.Status);
         Assert.Equal("UnhandledException", (await runner.GetHistoryAsync(result.WorkflowInstanceId))[0].ErrorCode);
         var services = new ServiceCollection();
-        services.AddPersistentWorkflows(); services.AddPersistentWorkflowsEntityFrameworkCore(o => o.UseSqlite($"Data Source={_path};Pooling=False"));
+        services.AddPersistentWorkflows(); services.AddPersistentWorkflowsEntityFrameworkCore(ConfigureDatabase);
         services.AddWorkflow<TestWorkflow, Data>();
         await using var invalid = services.BuildServiceProvider();
         var validator = invalid.GetServices<IHostedService>().Single();

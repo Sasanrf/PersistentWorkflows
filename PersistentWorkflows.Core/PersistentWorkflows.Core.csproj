@@ -11,6 +11,8 @@
 
   <PropertyGroup>
     <IsPackable>true</IsPackable>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>0.1.0-preview.2</PackageValidationBaselineVersion>
     <Description>Durable .NET workflow orchestration, recovery, scheduling, and hosting.</Description>
   </PropertyGroup>
 

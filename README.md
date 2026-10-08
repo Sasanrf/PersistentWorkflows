@@ -2,12 +2,12 @@
 
 Durable sequential workflows for .NET 10 applications. Applications define actions; the engine persists unfinished work, schedules retries, and recovers abandoned execution.
 
-Version `0.1.0-preview.2` is a preview. SQL Server is the packaged database provider. The relational store also has SQLite conformance tests; SQLite migrations and a standalone SQLite installation package are not shipped yet.
+Version `1.0.0` is the first stable release target. SQL Server is the packaged database provider. The relational store also has SQLite conformance tests; SQLite migrations and a standalone SQLite installation package are not shipped. See [support and compatibility](docs/SUPPORT.md) for the supported scope and [release notes](CHANGELOG.md) for this version.
 
 ## Install one package
 
 ```sh
-dotnet add package PersistentWorkflows.EntityFrameworkCore.SqlServer --version 0.1.0-preview.2
+dotnet add package PersistentWorkflows.EntityFrameworkCore.SqlServer --version 1.0.0
 ```
 
 NuGet brings in Core, Abstractions, and the EF store transitively. Consumers do not need four installation commands. Locally built packages can be installed from `artifacts/packages` before public publication.
@@ -101,7 +101,7 @@ The runtime account needs normal data access; production schema changes should u
 - An interrupted action can execute again, so actions and their external effects may occur multiple times. Successful external effects are not guaranteed: permanent failures, exhausted retries, or cancellation can stop execution. Make external effects idempotent; the engine does not provide exactly-once external effects.
 - `context.IdempotencyKey` is stable across attempts. Pass it to external systems or use an application-side unique constraint/outbox and reconciliation.
 - A lease cannot stop an external request already in flight. Timeouts/cancellation are cooperative; an action that ignores cancellation may continue after the engine stops waiting. Its late result is discarded.
-- No distributed transaction, automatic compensation, parallel branches, or child-workflow orchestration is provided in this preview.
+- No distributed transaction, automatic compensation, parallel branches, or child-workflow orchestration is provided in 1.0.
 - Work progresses while a worker is running and its database is available. Terminal failures need explicit intervention. An unnamed indefinite wait (`StepResult.Wait()`) requires manual resume; a named signal wait (`StepResult.WaitForSignal(name)`) resumes when that signal is available or through manual resume.
 
 See [USAGE.md](https://github.com/Sasanrf/PersistentWorkflows/blob/main/USAGE.md) for policies, operational APIs, versioning, and examples, and [docs/ARCHITECTURE.md](https://github.com/Sasanrf/PersistentWorkflows/blob/main/docs/ARCHITECTURE.md) for provider requirements.
@@ -121,6 +121,10 @@ Samples use dedicated sample databases on `localhost\SQLEXPRESS`. Override `PERS
 
 SQL Server conformance tests are opt-in through `PERSISTENTWORKFLOWS_TEST_SQLSERVER`. They create unique `PersistentWorkflowsTests_*` databases and delete only those databases. The supplied connection account must be permitted to create test databases. SQLite tests use temporary files and independent sessions.
 
+The same opt-in runs SQL Server runner durability, checkpoint fault injection, hosted-worker concurrency, and mixed-backlog load tests. See [the test audit](docs/TEST-AUDIT.md) for the guarantee-to-test mapping, measured results, reproduction commands, and remaining coverage gaps.
+
+[Targeted failure tests](docs/FAILURE-TESTS.md) also kill a child worker, take only their generated database offline/online, and inject post-COMMIT acknowledgement loss. The outage case requires permission to change that test database's availability.
+
 ## Package boundaries
 
 | Package | Responsibility |
@@ -130,4 +134,4 @@ SQL Server conformance tests are opt-in through `PERSISTENTWORKFLOWS_TEST_SQLSER
 | PersistentWorkflows.EntityFrameworkCore | Relational atomic persistence operations |
 | PersistentWorkflows.EntityFrameworkCore.SqlServer | SQL Server dependencies, registration, and migrations |
 
-Additional providers implement `IWorkflowStore` and run the provider conformance suite. Core has no EF dependency. See [docs/RELEASE.md](https://github.com/Sasanrf/PersistentWorkflows/blob/main/docs/RELEASE.md) for preview packaging and publication checks.
+Additional providers implement `IWorkflowStore` and run the provider conformance suite. Core has no EF dependency. See [docs/RELEASE.md](https://github.com/Sasanrf/PersistentWorkflows/blob/main/docs/RELEASE.md) for packaging and publication checks.

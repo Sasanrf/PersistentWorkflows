@@ -5,7 +5,7 @@ using Xunit;
 namespace PersistentWorkflows.EntityFrameworkCore.Tests.Execution;
 
 /// <summary>Derive this suite for each provider. Every call must use an independent database session.</summary>
-public abstract class WorkflowStoreConformanceTests
+public abstract partial class WorkflowStoreConformanceTests
 {
     protected abstract IWorkflowStore CreateStore();
     protected static readonly DateTime Now = new(2026, 10, 3, 12, 0, 0, DateTimeKind.Utc);

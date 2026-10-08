@@ -1,5 +1,11 @@
 # Validation — 0.1.0-preview.2
 
+Latest: [1.0.0 release preparation and validation](STABLE-VALIDATION.md), including final-package checks and pending hosted CI/publication. The records below retain the earlier preview evidence.
+
+An expanded [workflow guarantee audit](TEST-AUDIT.md) on 2026-10-08 passed 111 tests with SQL Server enabled, including runner recovery, injected checkpoint failure, concurrency bounds, and measured 120/480-workflow loads. That report maps guarantees to tests and records remaining coverage gaps. The release checks below describe the earlier 2026-10-03 validation.
+
+The subsequent [targeted failure validation](FAILURE-TESTS.md) passed 116 tests, adding real worker termination, isolated database outage/recovery, and post-COMMIT acknowledgement-loss retry scenarios.
+
 Validated locally on 2026-10-03 with .NET SDK 10.0.401, Release configuration.
 
 | Check | Result |

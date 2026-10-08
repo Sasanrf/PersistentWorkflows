@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>0.1.0-preview.2</PackageValidationBaselineVersion>
     <Description>Provider-neutral contracts for durable .NET workflows.</Description>
   </PropertyGroup>
 </Project>
