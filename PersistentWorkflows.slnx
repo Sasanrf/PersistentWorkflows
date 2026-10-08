@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/validation/">
+    <Project Path="validation/FailureWorker/FailureWorker.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path="README.md" />
     <File Path="USAGE.md" />

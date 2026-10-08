@@ -42,6 +42,6 @@ Both workers' private memory settled around 43–44 MiB after warm-up. Five-minu
 ## Final gates
 
 - Exact 1.0.0 package consumers: completed as recorded above.
-- Hosted Windows SQL Server and Linux portable CI: **pending**. GitHub API access was requested to inspect remote permissions/CI and was declined; no remote branch, release tag, PR, or CI run was created during this session. Local changes remain uncommitted.
+- Hosted CI: [PR #1](https://github.com/Sasanrf/PersistentWorkflows/pull/1) passed portable checks but initially failed Windows SQL Server checks on commit `f09f1f3`. The logs showed the crash helper building in Debug while tests expected Release, and fixed-delay shutdown cancellation racing with database setup. The follow-up includes FailureWorker in the solution, fails the build if its expected output is absent, and waits for action entry before shutdown cancellation. The `Pending` and cancellation assertions remain unchanged. All 116 local tests and the three affected cases in a fresh source copy passed. Hosted CI must rerun on the fix before merge/publication; it is not yet verified green.
 - Publish only with authenticated maintainer NuGet access after those gates pass. No NuGet API key was available in the release session's environment or configured NuGet API-key entries when checked.
 - After publication, repeat a NuGet.org smoke install. Transport-level acknowledgement loss, server failover, other deployment combinations and external business-system idempotency retain the limitations documented in the test reports.

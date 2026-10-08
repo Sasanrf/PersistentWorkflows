@@ -140,9 +140,15 @@ public class DurableWorkflowTests : IAsyncLifetime
     {
         await using var provider = Provider(); await using var scope = provider.CreateAsyncScope();
         var runner = scope.ServiceProvider.GetRequiredService<IWorkflowRunner>();
-        var result = await runner.EnqueueAsync<TestWorkflow, Data>("shutdown", new() { Mode = "hang" });
-        using var stop = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => runner.ResumeAsync(result.WorkflowInstanceId, stop.Token));
+        var result = await runner.EnqueueAsync<TestWorkflow, Data>("shutdown", new() { Mode = "gate" });
+        using var stop = new CancellationTokenSource();
+        var execution = runner.ResumeAsync(result.WorkflowInstanceId, stop.Token);
+        try
+        {
+            await provider.GetRequiredService<Gate>().Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        }
+        finally { stop.Cancel(); }
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => execution.WaitAsync(TimeSpan.FromSeconds(30)));
         Assert.Equal("Pending", (await runner.GetAsync(result.WorkflowInstanceId))!.Status);
     }
     [Fact]
